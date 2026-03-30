@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Diary Online</title>
+  <style>
+    body{ background:#f5f5f5; color:#222; font-family:Arial; padding:20px; transition: background 0.3s,color 0.3s;}
+    body.dark{ background:#121212; color:white;}
+    input,button,select{ padding:6px; margin:4px; border:1px solid #aaa; border-radius:4px; background:#fff;color:#222; transition: background 0.3s,color 0.3s; }
+    body.dark input,body.dark button,body.dark select{ background:#1e1e1e;color:white;border:1px solid #555; }
+    #error{ color:red; display:none; }
+    .box{ border:1px solid #444; margin:5px; padding:8px; transition:border 0.3s,background 0.3s; display:flex; justify-content:space-between; align-items:center; }
+    .highlight{ border:2px solid #00ff00 !important; background-color:#ddffdd !important; }
+    .month-section{ margin-bottom:20px; }
+    .month-title{ font-size:18px; font-weight:bold; margin:10px 0; display:flex; justify-content:space-between; }
+    #chartContainer{ margin-top:30px; }
+    .pinned-toggle{ margin:10px 0; cursor:pointer; font-weight:bold; }
+    .pinned-section{ display:none; margin-bottom:15px; border:1px dashed #888; padding:5px; background:#eee; }
+    body.dark .pinned-section{ background:#1e1e1e; border-color:#555; }
+    .pin-btn{ margin-left:5px; font-size:12px; padding:2px 4px; }
+    #themeSelect{ position:fixed;top:10px;right:10px;font-size:12px; }
+  </style>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<div id="login">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+</div>
+
+<div id="app" style="display:none;">
+  <h1>My Diary</h1>
+
+  <!-- Date & Time Picker -->
+  <input type="date" id="date">
+  <input type="time" id="time">
+  <input type="text" id="note" placeholder="Note">
+  <input type="number" id="amount" placeholder="Amount ₹">
+  <p id="error"></p>
+  <button id="addBtn" onclick="addEntry()">Add</button>
+
+  <select id="sort" onchange="loadData()">
+    <option value="new">Newest First</option>
+    <option value="old">Oldest First</option>
+  </select>
+  <input type="text" id="search" placeholder="Search..." onkeyup="searchData()">
+
+  <h3>Total This Month: ₹<span id="total">0</span></h3>
+
+  <div class="pinned-toggle" onclick="togglePinned()">📌 Pinned Messages</div>
+  <div id="pinned" class="pinned-section"></div>
+
+  <div id="list"></div>
+
+  <div id="chartContainer">
+    <canvas id="monthlyChart" height="150"></canvas>
+  </div>
+</div>
+
+<!-- Theme Select Dropdown -->
+<select id="themeSelect">
+  <option value="auto">Auto</option>
+  <option value="light">Light</option>
+  <option value="dark">Dark</option>
+</select>
+
+<script>
+const firebaseConfig={ 
+  apiKey:"AIzaSyDyHchZ-cMunCm428PivwvV6nKEAYpmDPs",
+  authDomain:"my-diary-14567.firebaseapp.com",
+  projectId:"my-diary-14567",
+  storageBucket:"my-diary-14567.firebasestorage.app",
+  messagingSenderId:"929514949228",
+  appId:"1:929514949228:web:e697ffab1e11cc0ec66649"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+let data=[],editId=null,monthlyChart=null;
+
+// Theme load
+window.addEventListener("DOMContentLoaded",()=>{
+  const savedTheme = localStorage.getItem("theme") || "auto";
+  const themeSelect = document.getElementById("themeSelect");
+  themeSelect.value = savedTheme;
+  applyTheme(savedTheme);
+  themeSelect.addEventListener("change", ()=>{
+    const selected = themeSelect.value;
+    localStorage.setItem("theme", selected);
+    applyTheme(selected);
+  });
+});
+
+function applyTheme(theme){
+  if(theme === "light"){ document.body.classList.remove("dark"); } 
+  else if(theme === "dark"){ document.body.classList.add("dark"); } 
+  else if(theme === "auto"){
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if(prefersDark) document.body.classList.add("dark");
+    else document.body.classList.remove("dark");
+  }
+}
+
+// Login
+function login(){
+  let email=document.getElementById("email").value;
+  let password=document.getElementById("password").value;
+  if(!email||!password){ alert("Enter email & password"); return; }
+  firebase.auth().signInWithEmailAndPassword(email,password)
+    .then(()=>{ document.getElementById("login").style.display="none"; document.getElementById("app").style.display="block"; loadData(); })
+    .catch(err=>{ alert("Login Error: "+err.message); });
+}
+
+// Add/Update Entry
+async function addEntry(){
+  let date=document.getElementById("date").value;
+  let time=document.getElementById("time").value;
+  let note=document.getElementById("note").value;
+  let amount=Number(document.getElementById("amount").value);
+
+  if(!date||!time||!note||!amount){ 
+    document.getElementById("error").innerText="All fields required"; 
+    document.getElementById("error").style.display="block"; 
+    return; 
+  }
+
+  const [year,month,day] = date.split("-");
+  const formattedDate = day+"/"+month+"/"+year+" "+time;
+
+  if(editId){
+    await db.collection("entries").doc(editId).update({date: formattedDate, note, amount});
+    editId=null; document.getElementById("addBtn").innerText="Add";
+  } else {
+    await db.collection("entries").add({date: formattedDate, note, amount, pinned:false, created:Date.now()});
+  }
+  document.getElementById("error").style.display="none";
+  clearFields(); loadData();
+}
+
+// Load Data and sort by date+time
+async function loadData(){
+  let snapshot = await db.collection("entries").get();
+  data = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+  let sortType = document.getElementById("sort").value;
+
+  data.sort((a,b)=>{
+    const parseDate = str=>{
+      const [d,m,y,t] = str.split(/[/ ]/);
+      const [h,min] = t.split(":").map(Number);
+      return new Date(y,m-1,d,h,min);
+    };
+    const dateA = parseDate(a.date);
+    const dateB = parseDate(b.date);
+    return sortType==="new"? dateB-dateA : dateA-dateB;
+  });
+
+  display(data);
+  renderChart(data);
+}
+
+// Display
+function display(arr){
+  const list=document.getElementById("list");
+  const pinnedDiv=document.getElementById("pinned");
+  list.innerHTML=""; pinnedDiv.innerHTML="";
+  let totalThisMonth=0;
+  const now=new Date();
+  const grouped={};
+
+  arr.forEach(item=>{
+    const [day,month,year] = item.date.split(" ")[0].split("/");
+    const dt = new Date(year,month-1,day);
+    const monthKey = dt.getFullYear()+"-"+(dt.getMonth()+1);
+    if(!grouped[monthKey]) grouped[monthKey]=[];
+    grouped[monthKey].push(item);
+    if(dt.getMonth()===now.getMonth() && dt.getFullYear()===now.getFullYear()) totalThisMonth+=item.amount;
+  });
+
+  document.getElementById("total").innerText=totalThisMonth;
+
+  Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).forEach(monthKey=>{
+    const monthItems=grouped[monthKey];
+    const [year,month]=monthKey.split("-");
+    const monthName=new Date(year,month-1).toLocaleString('default',{month:'long',year:'numeric'});
+    const monthTotal=monthItems.reduce((s,i)=>s+i.amount,0);
+
+    const monthDiv=document.createElement("div");
+    monthDiv.className="month-section";
+    monthDiv.innerHTML=`<div class="month-title">${monthName} - Total ₹${monthTotal}</div>`;
+
+    monthItems.forEach(item=>{
+      const box=document.createElement("div");
+      box.className="box";
+      box.id="item-"+item.id;
+      box.innerHTML=`<p>${item.date} - ${item.note} - ₹${item.amount}</p>
+        <div>
+        <button onclick="editItem('${item.id}')">Edit</button>
+        <button onclick="deleteItem('${item.id}')">Delete</button>
+        <button class="pin-btn" onclick="togglePin('${item.id}')">${item.pinned?'Unpin':'Pin'}</button>
+        </div>`;
+      monthDiv.appendChild(box);
+      if(item.pinned){ pinnedDiv.appendChild(box.cloneNode(true)); }
+    });
+    list.appendChild(monthDiv);
+  });
+}
+
+// Pin/Unpin/Search/Edit/Delete/Clear
+function togglePinned(){ const sec=document.getElementById("pinned"); sec.style.display=sec.style.display==="block"?"none":"block"; }
+function searchData(){ let text=document.getElementById("search").value.toLowerCase(); display(data.filter(d=>d.note.toLowerCase().includes(text))); }
+async function deleteItem(id){ await db.collection("entries").doc(id).delete(); loadData(); }
+async function togglePin(id){ const item=data.find(d=>d.id===id); await db.collection("entries").doc(id).update({pinned:!item.pinned}); loadData(); }
+function editItem(id){ 
+  let item=data.find(d=>d.id===id); 
+  const [day,month,year,time] = item.date.split(/[/ ]/); 
+  document.getElementById("date").value=`${year}-${month}-${day}`; 
+  document.getElementById("time").value=time; 
+  document.getElementById("note").value=item.note; 
+  document.getElementById("amount").value=item.amount; 
+  editId=id; 
+  document.getElementById("addBtn").innerText="Update"; 
+}
+function clearFields(){ document.getElementById("date").value=""; document.getElementById("time").value=""; document.getElementById("note").value=""; document.getElementById("amount").value=""; if(!editId) document.getElementById("addBtn").innerText="Add"; }
+
+// Monthly Chart
+function renderChart(arr){
+  const monthlyTotals={};
+  arr.forEach(item=>{
+    const [day,month,year] = item.date.split(" ")[0].split("/");
+    const dt = new Date(Number(year), Number(month)-1, Number(day));
+    const key = dt.getFullYear()+"-"+(dt.getMonth()+1);
+    if(!monthlyTotals[key]) monthlyTotals[key]=0;
+    monthlyTotals[key]+=item.amount;
+  });
+
+  const labels = Object.keys(monthlyTotals).sort((a,b)=>{
+    const [ay,am] = a.split("-").map(Number);
+    const [by,bm] = b.split("-").map(Number);
+    return new Date(ay,am-1)-new Date(by,bm-1);
+  });
+
+  const dataVals = labels.map(l=>monthlyTotals[l]);
+  const labelNames = labels.map(l=>{
+    const [y,m] = l.split("-");
+    return new Date(Number(y), Number(m)-1).toLocaleString('default',{month:'short',year:'numeric'});
+  });
+
+  const now = new Date();
+  const bgColors = labels.map(l=>{
+    const [y,m] = l.split("-");
+    const d = new Date(Number(y), Number(m)-1);
+    return (d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()) ? 'rgba(255,99,132,0.7)' : 'rgba(75,192,192,0.6)';
+  });
+
+  if(monthlyChart) monthlyChart.destroy();
+  const ctx = document.getElementById("monthlyChart").getContext("2d");
+  monthlyChart = new Chart(ctx,{
+    type:'bar',
+    data:{ labels:labelNames, datasets:[{label:'Monthly Total ₹', data:dataVals, backgroundColor:bgColors}] },
+    options:{ responsive:true, plugins:{ legend:{display:true} }, scales:{ y:{ beginAtZero:true } } }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+body {
+  background: #121212;
+  color: white;
+  font-family: Arial;
+  padding: 20px;
+}
+
+input, button, select {
+  margin: 5px;
+  padding: 10px;
+  background: #1e1e1e;
+  color: white;
+  border: none;
+}
+
+img {
+  width: 80px;
+  display: block;
+}
