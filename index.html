@@ -70,31 +70,12 @@
 
   <input type="date" id="date">
   <input type="time" id="time">
-<textarea id="note" placeholder="Note (Enter for new line)"></textarea>
-<input type="text" id="amount" placeholder="Amount auto-calculated from Note" readonly>
-<p id="error" style="color:red;"></p>
-
-<script>
-const note = document.getElementById("note");
-const amount = document.getElementById("amount");
-const error = document.getElementById("error");
-
-note.addEventListener("input", function () {
-    let text = note.value;
-
-    // Find all numbers (integer + decimal)
-    let numbers = text.match(/-?\d+(\.\d+)?/g);
-
-    if (numbers) {
-        let sum = numbers.reduce((total, num) => total + parseFloat(num), 0);
-        amount.value = sum.toFixed(2);
-        error.textContent = "";
-    } else {
-        amount.value = "";
-        error.textContent = "No valid numbers found!";
-    }
-});
-</script>
+  <textarea id="note" placeholder="Note (Enter for new line)"></textarea>
+<div style="display:flex; gap:5px; align-items:center;">
+  <input type="text" id="liveAmount" placeholder="Live Amount" readonly>
+  <input type="text" id="amount" placeholder="Amount auto-calculated from Note">
+</div>
+<p id="error"></p>
 
   <!-- Clear + Add buttons -->
   <div class="action-buttons">
@@ -181,6 +162,13 @@ function parseAmount(note, manualAmount){
   return matches.reduce((sum,val)=>sum+parseInt(val),0);
 }
 
+// Live amount calculation while typing
+document.getElementById("note").addEventListener("input", () => {
+  const note = document.getElementById("note").value;
+  const liveAmt = parseAmount(note, null);
+  document.getElementById("liveAmount").value = liveAmt;
+});
+
 // Add/Update Entry
 async function addEntry(){
   let date=document.getElementById("date").value || new Date().toISOString().split('T')[0];
@@ -208,13 +196,14 @@ async function addEntry(){
 }
 
 // Clear all fields
-function clearAllFields() {
-  document.getElementById("date").value = "";
-  document.getElementById("time").value = "";
-  document.getElementById("note").value = "";
-  document.getElementById("amount").value = "";
-  editId = null;
-  document.getElementById("addBtn").innerText = "Add";
+function clearAllFields() {  
+  document.getElementById("date").value = "";  
+  document.getElementById("time").value = "";  
+  document.getElementById("note").value = "";  
+  document.getElementById("amount").value = "";  
+  document.getElementById("liveAmount").value = ""; // ✅ Clear live amount
+  editId = null;  
+  document.getElementById("addBtn").innerText = "Add";  
 }
 
 // Load Data and sort
@@ -321,6 +310,8 @@ function editItem(id){
   document.getElementById("time").value = time; 
   document.getElementById("note").value = item.note; 
   document.getElementById("amount").value = item.amount; 
+
+document.getElementById("liveAmount").value = parseAmount(item.note, null);
 
   editId = id; 
   document.getElementById("addBtn").innerText = "Update"; 
