@@ -70,9 +70,31 @@
 
   <input type="date" id="date">
   <input type="time" id="time">
-  <textarea id="note" placeholder="Note (Enter for new line)"></textarea>
-  <input type="text" id="amount" placeholder="Amount auto-calculated from Note">
-  <p id="error"></p>
+<textarea id="note" placeholder="Note (Enter for new line)"></textarea>
+<input type="text" id="amount" placeholder="Amount auto-calculated from Note" readonly>
+<p id="error" style="color:red;"></p>
+
+<script>
+const note = document.getElementById("note");
+const amount = document.getElementById("amount");
+const error = document.getElementById("error");
+
+note.addEventListener("input", function () {
+    let text = note.value;
+
+    // Find all numbers (integer + decimal)
+    let numbers = text.match(/-?\d+(\.\d+)?/g);
+
+    if (numbers) {
+        let sum = numbers.reduce((total, num) => total + parseFloat(num), 0);
+        amount.value = sum.toFixed(2);
+        error.textContent = "";
+    } else {
+        amount.value = "";
+        error.textContent = "No valid numbers found!";
+    }
+});
+</script>
 
   <!-- Clear + Add buttons -->
   <div class="action-buttons">
@@ -291,14 +313,32 @@ async function deleteItem(id){
 
 async function togglePin(id){ const item=data.find(d=>d.id===id); await db.collection("entries").doc(id).update({pinned:!item.pinned}); loadData(); }
 function editItem(id){ 
-  let item=data.find(d=>d.id===id); 
+  let item = data.find(d => d.id === id); 
+
   const [day,month,year,time] = item.date.split(/[/ ]/); 
-  document.getElementById("date").value=`${year}-${month}-${day}`; 
-  document.getElementById("time").value=time; 
-  document.getElementById("note").value=item.note; 
-  document.getElementById("amount").value=item.amount; 
-  editId=id; 
-  document.getElementById("addBtn").innerText="Update"; 
+
+  document.getElementById("date").value = `${year}-${month}-${day}`; 
+  document.getElementById("time").value = time; 
+  document.getElementById("note").value = item.note; 
+  document.getElementById("amount").value = item.amount; 
+
+  editId = id; 
+  document.getElementById("addBtn").innerText = "Update"; 
+
+  // 🔥 AUTO SCROLL + FOCUS
+  setTimeout(() => {
+    const noteBox = document.getElementById("note");
+
+    // Scroll to note box smoothly
+    noteBox.scrollIntoView({ 
+      behavior: "smooth", 
+      block: "center" 
+    });
+
+    // Focus cursor inside note box
+    noteBox.focus();
+
+  }, 200);
 }
 
 // Monthly Chart
