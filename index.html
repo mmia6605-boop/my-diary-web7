@@ -16,12 +16,12 @@
     .pinned-section{ display:none; margin-bottom:10px; border:1px dashed #888; padding:5px; background:#eee; }
     body.dark .pinned-section{ background:#1e1e1e; border-color:#555; }
 
-    /* Compact cards with swipe */
-    .box{ border:1px solid #444; margin:4px 0; padding:6px; display:flex; justify-content:space-between; align-items:center; font-size:14px; position:relative; overflow:hidden; border-radius:6px; background:#fff; transition:0.3s; }
+    /* Box & Swipe */
+    .box{ border:1px solid #444; margin:4px 0; padding:6px; display:flex; justify-content:flex-start; align-items:center; font-size:14px; position:relative; overflow:hidden; border-radius:6px; background:#fff; transition:0.3s; touch-action: pan-y;}
     body.dark .box{ background:#1e1e1e; border-color:#555; color:white;}
-    .box-content{ flex:1; padding-right:80px; white-space: pre-wrap; word-break: break-word; }
-    .box-buttons{ position:absolute; right:0; top:0; height:100%; display:flex; align-items:center; background:transparent; }
-    .box-buttons button{ margin:0 2px; font-size:12px; padding:2px 4px; }
+    .box-content{ flex:1; padding-right:90px; white-space: pre-wrap; word-break: break-word; }
+    .box-buttons{ position:absolute; right:-90px; top:0; height:100%; display:flex; align-items:center; background:transparent; transition: right 0.3s; }
+    .box-buttons button{ margin:0 2px; font-size:12px; padding:2px 6px; }
 
     /* Theme Selector small */
     #themeSelect{
@@ -67,7 +67,6 @@
 <div id="app" style="display:none;">
   <h1>My Diary</h1>
 
-  <!-- Date & Time Picker -->
   <input type="date" id="date">
   <input type="time" id="time">
   <textarea id="note" placeholder="Note (Enter for new line)"></textarea>
@@ -93,7 +92,6 @@
   </div>
 </div>
 
-<!-- Theme Select Dropdown -->
 <select id="themeSelect">
   <option value="auto">Auto</option>
   <option value="light">Light</option>
@@ -179,7 +177,7 @@ async function addEntry(){
   clearFields(); loadData();
 }
 
-// Load Data and sort by date+time
+// Load Data and sort
 async function loadData(){
   let snapshot = await db.collection("entries").get();
   data = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -200,7 +198,7 @@ async function loadData(){
   renderChart(data);
 }
 
-// Display
+// Display with swipe
 function display(arr){
   const list=document.getElementById("list");
   const pinnedDiv=document.getElementById("pinned");
@@ -238,10 +236,24 @@ function display(arr){
         <div class="box-content">${item.date} - ${item.note} - ₹${item.amount}</div>
         <div class="box-buttons">
           <button onclick="editItem('${item.id}')">Edit</button>
-          <button onclick="deleteItem('${item.id}')">Delete</button>
           <button onclick="togglePin('${item.id}')">${item.pinned?'Unpin':'Pin'}</button>
+          <button onclick="deleteItem('${item.id}')">Delete</button>
         </div>
       `;
+
+      // Swipe functionality
+      let startX=0;
+      box.addEventListener('touchstart', e=>{ startX=e.touches[0].clientX; });
+      box.addEventListener('touchmove', e=>{
+        let diff = e.touches[0].clientX - startX;
+        if(diff<0){ box.querySelector('.box-buttons').style.right=Math.min(-diff,90)+'px'; }
+      });
+      box.addEventListener('touchend', e=>{
+        let rightVal = parseInt(box.querySelector('.box-buttons').style.right);
+        if(rightVal>45){ box.querySelector('.box-buttons').style.right='0px'; } 
+        else { box.querySelector('.box-buttons').style.right='-90px'; }
+      });
+
       monthDiv.appendChild(box);
       if(item.pinned){ pinnedDiv.appendChild(box.cloneNode(true)); }
     });
@@ -253,10 +265,8 @@ function display(arr){
 function togglePinned(){ const sec=document.getElementById("pinned"); sec.style.display=sec.style.display==="block"?"none":"block"; }
 function searchData(){ let text=document.getElementById("search").value.toLowerCase(); display(data.filter(d=>d.note.toLowerCase().includes(text))); }
 
-// Delete with Confirmation
 async function deleteItem(id){
-  const confirmDelete = confirm("Are you sure you want to delete this entry?");
-  if(!confirmDelete) return;
+  if(!confirm("Are you sure you want to delete this entry?")) return;
   await db.collection("entries").doc(id).delete();
   loadData();
 }
