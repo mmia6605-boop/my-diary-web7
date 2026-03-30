@@ -43,8 +43,9 @@
     }
 
     /* Inputs compact */
-    #date,#time,#note,#amount,#sort,#search,#addBtn{ width:100%; box-sizing:border-box; }
+    #date,#time,#note,#amount,#sort,#search,#addBtn,#clearBtn{ width:100%; box-sizing:border-box; }
     #note{ min-height:50px; }
+    .action-buttons{ display:flex; gap:5px; }
   </style>
 
   <!-- Firebase -->
@@ -72,7 +73,12 @@
   <textarea id="note" placeholder="Note (Enter for new line)"></textarea>
   <input type="text" id="amount" placeholder="Amount auto-calculated from Note">
   <p id="error"></p>
-  <button id="addBtn" onclick="addEntry()">Add</button>
+
+  <!-- Clear + Add buttons -->
+  <div class="action-buttons">
+    <button id="clearBtn" onclick="clearAllFields()">Clear</button>
+    <button id="addBtn" onclick="addEntry()">Add</button>
+  </div>
 
   <select id="sort" onchange="loadData()">
     <option value="new">Newest First</option>
@@ -146,7 +152,8 @@ function login(){
 }
 
 // Parse amount from note
-function parseAmount(note){
+function parseAmount(note, manualAmount){
+  if(manualAmount) return parseInt(manualAmount) || 0;
   const matches = note.match(/\d+/g);
   if(!matches) return 0;
   return matches.reduce((sum,val)=>sum+parseInt(val),0);
@@ -162,7 +169,8 @@ async function addEntry(){
     document.getElementById("error").style.display="block"; 
     return; 
   }
-  let amount = parseAmount(note);
+  let manualAmount=document.getElementById("amount").value.trim();
+  let amount = parseAmount(note, manualAmount);
 
   const [year,month,day] = date.split("-");
   const formattedDate = day+"/"+month+"/"+year+" "+time;
@@ -174,7 +182,17 @@ async function addEntry(){
     await db.collection("entries").add({date: formattedDate, note, amount, pinned:false, created:Date.now()});
   }
   document.getElementById("error").style.display="none";
-  clearFields(); loadData();
+  clearAllFields(); loadData();
+}
+
+// Clear all fields
+function clearAllFields() {
+  document.getElementById("date").value = "";
+  document.getElementById("time").value = "";
+  document.getElementById("note").value = "";
+  document.getElementById("amount").value = "";
+  editId = null;
+  document.getElementById("addBtn").innerText = "Add";
 }
 
 // Load Data and sort
@@ -282,7 +300,6 @@ function editItem(id){
   editId=id; 
   document.getElementById("addBtn").innerText="Update"; 
 }
-function clearFields(){ document.getElementById("date").value=""; document.getElementById("time").value=""; document.getElementById("note").value=""; document.getElementById("amount").value=""; if(!editId) document.getElementById("addBtn").innerText="Add"; }
 
 // Monthly Chart
 function renderChart(arr){
