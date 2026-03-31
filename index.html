@@ -83,7 +83,7 @@ body.dark #liveAmount {
   <input type="text" id="amount" placeholder="Amount auto-calculated from Note">
 </div>
 <p id="error"></p>
-
+  <input type="file" id="imageInput" accept="image/*">
   <!-- Clear + Add buttons -->
   <div class="action-buttons">
     <button id="clearBtn" onclick="clearAllFields()">Clear</button>
@@ -175,7 +175,18 @@ document.getElementById("note").addEventListener("input", () => {
   const liveAmt = parseAmount(note, null);
   document.getElementById("liveAmount").value = liveAmt;
 });
+let imageBase64 = null;
 
+// Convert selected image to Base64
+document.getElementById("imageInput").addEventListener("change", function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    imageBase64 = evt.target.result; // store Base64 string
+  };
+  reader.readAsDataURL(file);
+});
 // Add/Update Entry
 async function addEntry(){
   let date=document.getElementById("date").value || new Date().toISOString().split('T')[0];
@@ -192,14 +203,21 @@ async function addEntry(){
   const [year,month,day] = date.split("-");
   const formattedDate = day+"/"+month+"/"+year+" "+time;
 
+  const entryData = { date: formattedDate, note, amount, pinned:false, created:Date.now(), image:imageBase64 };
+
   if(editId){
-    await db.collection("entries").doc(editId).update({date: formattedDate, note, amount});
-    editId=null; document.getElementById("addBtn").innerText="Add";
+    await db.collection("entries").doc(editId).update(entryData);
+    editId=null; 
+    document.getElementById("addBtn").innerText="Add";
   } else {
-    await db.collection("entries").add({date: formattedDate, note, amount, pinned:false, created:Date.now()});
+    await db.collection("entries").add(entryData);
   }
+
   document.getElementById("error").style.display="none";
-  clearAllFields(); loadData();
+  clearAllFields(); 
+  imageBase64 = null; // reset image
+  document.getElementById("imageInput").value = ""; // clear file input
+  loadData();
 }
 
 // Clear all fields
@@ -268,14 +286,17 @@ function display(arr){
       const box=document.createElement("div");
       box.className="box";
       box.id="item-"+item.id;
-      box.innerHTML=`
-        <div class="box-content">${item.date} - ${item.note} - ₹${item.amount}</div>
-        <div class="box-buttons">
-          <button onclick="editItem('${item.id}')">Edit</button>
-          <button onclick="togglePin('${item.id}')">${item.pinned?'Unpin':'Pin'}</button>
-          <button onclick="deleteItem('${item.id}')">Delete</button>
-        </div>
-      `;
+      box.innerHTML = `
+  <div class="box-content">
+    ${item.date} - ${item.note} - ₹${item.amount}
+    ${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px;">` : ''}
+  </div>
+  <div class="box-buttons">
+    <button onclick="editItem('${item.id}')">Edit</button>
+    <button onclick="togglePin('${item.id}')">${item.pinned?'Unpin':'Pin'}</button>
+    <button onclick="deleteItem('${item.id}')">Delete</button>
+  </div>
+`;
 
       // Swipe functionality
       let startX=0;
@@ -308,34 +329,37 @@ async function deleteItem(id){
 }
 
 async function togglePin(id){ const item=data.find(d=>d.id===id); await db.collection("entries").doc(id).update({pinned:!item.pinned}); loadData(); }
-function editItem(id){ 
-  let item = data.find(d => d.id === id); 
-
-  const [day,month,year,time] = item.date.split(/[/ ]/); 
-
-  document.getElementById("date").value = `${year}-${month}-${day}`; 
-  document.getElementById("time").value = time; 
-  document.getElementById("note").value = item.note; 
-  document.getElementById("amount").value = item.amount; 
-
-document.getElementById("liveAmount").value = parseAmount(item.note, null);
-
-  editId = id; 
-  document.getElementById("addBtn").innerText = "Update"; 
-
+function editItem(id) {
+  let item = data.find(d => d.id === id);
+  
+  const [day, month, year, time] = item.date.split(/[/ ]/);
+  
+  document.getElementById("date").value = `${year}-${month}-${day}`;
+  document.getElementById("time").value = time;
+  document.getElementById("note").value = item.note;
+  document.getElementById("amount").value = item.amount;
+  document.getElementById("liveAmount").value = parseAmount(item.note, null);
+  
+  // ✅ Show previous image if exists
+  imageBase64 = item.image || null;
+  document.getElementById("imageInput").value = ""; // clear file input so user can replace
+  
+  editId = id;
+  document.getElementById("addBtn").innerText = "Update";
+  
   // 🔥 AUTO SCROLL + FOCUS
   setTimeout(() => {
     const noteBox = document.getElementById("note");
-
+    
     // Scroll to note box smoothly
-    noteBox.scrollIntoView({ 
-      behavior: "smooth", 
-      block: "center" 
+    noteBox.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
     });
-
+    
     // Focus cursor inside note box
     noteBox.focus();
-
+    
   }, 200);
 }
 
