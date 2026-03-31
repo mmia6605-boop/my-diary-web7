@@ -170,10 +170,18 @@ function parseAmount(note, manualAmount){
 }
 
 // Live amount calculation while typing
-document.getElementById("note").addEventListener("input", () => {
-  const note = document.getElementById("note").value;
+const noteBox = document.getElementById("note");
+
+noteBox.addEventListener("input", () => {
+  const note = noteBox.value;
+  
+  // ✅ Live amount
   const liveAmt = parseAmount(note, null);
   document.getElementById("liveAmount").value = liveAmt;
+  
+  // ✅ Auto height
+  noteBox.style.height = "auto"; // reset
+  noteBox.style.height = noteBox.scrollHeight + "px"; // grow
 });
 let imageBase64 = null;
 
@@ -225,8 +233,10 @@ function clearAllFields() {
   document.getElementById("date").value = "";  
   document.getElementById("time").value = "";  
   document.getElementById("note").value = "";  
+  document.getElementById("note").style.height = "50px"; // ✅ reset height
   document.getElementById("amount").value = "";  
-  document.getElementById("liveAmount").value = ""; // ✅ Clear live amount
+  document.getElementById("liveAmount").value = "";
+  document.getElementById("imageInput").value = "";
   editId = null;  
   document.getElementById("addBtn").innerText = "Add";  
 }
@@ -289,7 +299,9 @@ function display(arr){
       box.innerHTML = `
   <div class="box-content">
     ${item.date} - ${item.note} - ₹${item.amount}
-    ${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px;">` : ''}
+    ${item.image ? `<br><img src="${item.image}" 
+  style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" 
+  onclick="openImage('${item.image}')">` : ''}
   </div>
   <div class="box-buttons">
     <button onclick="editItem('${item.id}')">Edit</button>
@@ -337,6 +349,11 @@ function editItem(id) {
   document.getElementById("date").value = `${year}-${month}-${day}`;
   document.getElementById("time").value = time;
   document.getElementById("note").value = item.note;
+  const noteBox = document.getElementById("note");
+
+// ✅ Auto expand based on existing text
+noteBox.style.height = "auto";
+noteBox.style.height = noteBox.scrollHeight + "px";
   document.getElementById("amount").value = item.amount;
   document.getElementById("liveAmount").value = parseAmount(item.note, null);
   
@@ -435,6 +452,63 @@ function logout(){
       alert("Logout error: " + err.message);
     });
 }
+function openImage(src) {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("modalImage");
+  const downloadBtn = document.getElementById("downloadBtn");
+  
+  img.src = src;
+  downloadBtn.href = src; // ✅ set download link
+  
+  modal.style.display = "flex";
+}
+
+function closeImage() {
+  const modal = document.getElementById("imageModal");
+  const img = document.getElementById("modalImage");
+  
+  modal.style.display = "none";
+  img.src = "";
+}
+
+// Optional: click outside to close
+document.getElementById("imageModal").addEventListener("click", function(e) {
+  if (e.target.id === "imageModal") {
+    closeImage();
+  }
+});
 </script>
+<!-- ✅ IMAGE MODAL START -->
+<div id="imageModal" style="
+  display:none;
+  position:fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.9);
+  justify-content:center;
+  align-items:center;
+  z-index:2000;
+  flex-direction:column;
+">
+  
+  <img id="modalImage" style="
+  max-width:95%;
+  max-height:80%;
+  border-radius:8px;
+  margin-bottom:10px;
+">
+
+<div style="display:flex; gap:10px;">
+  <a id="downloadBtn" download="diary-image.jpg">
+    <button style="padding:6px 12px; font-size:14px;">Download</button>
+  </a>
+  
+  <button onclick="closeImage()" style="padding:6px 12px; font-size:14px;">
+    Close
+  </button>
+</div>
+  
+</div>
+<!-- ✅ IMAGE MODAL END -->
 </body>
 </html>
