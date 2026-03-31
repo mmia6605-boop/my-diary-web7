@@ -27,7 +27,7 @@
     #themeSelect{
       position: fixed;
       top: 8px;
-      right: 8px;
+      left: 8px;
       font-size: 11px;
       padding: 2px 4px;
       border-radius: 4px;
@@ -72,6 +72,7 @@ body.dark #liveAmount {
 </div>
 
 <div id="app" style="display:none;">
+  <button onclick="logout()" style="position:absolute; top:10px; right:10px; padding:5px 10px;">Logout</button>
   <h1>My Diary</h1>
 
   <input type="date" id="date">
@@ -375,6 +376,40 @@ function renderChart(arr){
     data:{ labels:labelNames, datasets:[{label:'Monthly Total ₹', data:dataVals, backgroundColor:bgColors}] },
     options:{ responsive:true, plugins:{ legend:{display:true} }, scales:{ y:{ beginAtZero:true } } }
   });
+}
+
+function logout(){
+  firebase.auth().signOut()
+    .then(()=>{
+      alert("Logged out successfully!");
+      document.getElementById("app").style.display = "none";
+      document.getElementById("login").style.display = "block";
+      clearAllFields(); // reset all inputs
+    })
+    .catch(err=>{
+      alert("Logout error: " + err.message);
+    });
+}
+function logout(){
+  firebase.auth().signOut()
+    .then(()=>{
+      alert("Logged out successfully!");
+      
+      // Hide diary page, show login page
+      document.getElementById("app").style.display = "none";
+      document.getElementById("login").style.display = "block";
+      
+      // Clear all diary fields
+      clearAllFields();
+      
+      // ✅ Clear login page inputs
+      document.getElementById("email").value = "";
+      document.getElementById("password").value = "";
+      
+    })
+    .catch(err=>{
+      alert("Logout error: " + err.message);
+    });
 }
 </script>
 </body>
