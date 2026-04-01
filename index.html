@@ -254,6 +254,8 @@ function clearAllFields() {
   document.getElementById("imageInput").value = "";
   editId = null;  
   document.getElementById("addBtn").innerText = "Add";  
+  document.getElementById("search").value = "";
+loadData(); // ✅ reload full data
 }
 
 // Load Data and sort
@@ -347,7 +349,38 @@ function display(arr){
 
 // Pin/Unpin/Search/Edit/Delete/Clear
 function togglePinned(){ const sec=document.getElementById("pinned"); sec.style.display=sec.style.display==="block"?"none":"block"; }
-function searchData(){ let text=document.getElementById("search").value.toLowerCase(); display(data.filter(d=>d.note.toLowerCase().includes(text))); }
+function searchData() {
+  let text = document.getElementById("search").value.toLowerCase().trim();
+  
+  if (!text) {
+    display(data);
+    return;
+  }
+  
+  const filtered = data.filter(d => {
+    // 🔍 Note search
+    const noteMatch = d.note.toLowerCase().includes(text);
+    
+    // 📅 Date parts
+    const [day, month, year] = d.date.split(" ")[0].split("/");
+    
+    const dateObj = new Date(year, month - 1, day);
+    
+    const monthName = dateObj.toLocaleString('default', { month: 'long' }).toLowerCase(); // march
+    const monthShort = dateObj.toLocaleString('default', { month: 'short' }).toLowerCase(); // mar
+    
+    // 🔍 Month match
+    const monthMatch =
+      monthName.includes(text) ||
+      monthShort.includes(text) ||
+      month === text ||
+      year.includes(text);
+    
+    return noteMatch || monthMatch;
+  });
+  
+  display(filtered);
+}
 
 async function deleteItem(id){
   if(!confirm("Are you sure you want to delete this entry?")) return;
