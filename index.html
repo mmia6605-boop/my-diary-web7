@@ -162,11 +162,26 @@ function login(){
 }
 
 // Parse amount from note
-function parseAmount(note, manualAmount){
-  if(manualAmount) return parseInt(manualAmount) || 0;
-  const matches = note.match(/\d+/g);
-  if(!matches) return 0;
-  return matches.reduce((sum,val)=>sum+parseInt(val),0);
+function parseAmount(note, manualAmount) {
+  if (manualAmount) return parseInt(manualAmount) || 0;
+  
+  if (!note) return 0;
+  
+  // ✅ Replace comma with +
+  let expr = note.replace(/,/g, "+");
+  
+  // ✅ Add + between numbers if no operator (space case)
+  expr = expr.replace(/(\d)\s+(\d)/g, "$1+$2");
+  
+  // ✅ Keep only valid characters (security)
+  expr = expr.replace(/[^0-9+\-]/g, "");
+  
+  try {
+    // ✅ Evaluate expression
+    return eval(expr) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 // Live amount calculation while typing
