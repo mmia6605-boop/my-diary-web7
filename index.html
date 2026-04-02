@@ -126,32 +126,23 @@ body.dark #liveAmount {
   right: 10px;
   width: 40px;
   height: 40px;
-  border: none;
   border-radius: 50%;
   font-size: 18px;
+  border: none;
   cursor: pointer;
   z-index: 999;
-  opacity: 0.7;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
 }
 
-#topBtn{
-  bottom: 70px;
-}
+#topBtn{ bottom: 70px; }
+#bottomBtn{ bottom: 20px; }
 
-#bottomBtn{
-  bottom: 20px;
-}
-
-#topBtn:hover, #bottomBtn:hover{
-  opacity: 1;
-}
-#topBtn, #bottomBtn{
-  display: none; /* default hide */
-}
-
-body.logged-in #topBtn,
-body.logged-in #bottomBtn{
-  display: block; /* show only after login */
+#topBtn.show, #bottomBtn.show{
+  opacity: 0.8;
+  pointer-events: auto;
 }
   </style>
 
@@ -771,7 +762,52 @@ function closeImage() {
   modal.style.display = "none";
   img.src = "";
 }
+let hideTimer;
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function scrollToBottom() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+function handleScrollButtons() {
+  const topBtn = document.getElementById("topBtn");
+  const bottomBtn = document.getElementById("bottomBtn");
+  
+  if (!topBtn || !bottomBtn) return;
+  
+  const scrollTop = window.scrollY;
+  const pageHeight = document.documentElement.scrollHeight;
+  const screenHeight = window.innerHeight;
+  
+  // Show buttons
+  if (scrollTop > 50) {
+    topBtn.classList.add("show");
+  } else {
+    topBtn.classList.remove("show");
+  }
+  
+  if (scrollTop + screenHeight < pageHeight - 50) {
+    bottomBtn.classList.add("show");
+  } else {
+    bottomBtn.classList.remove("show");
+  }
+  
+  // Auto hide after 3 sec
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    topBtn.classList.remove("show");
+    bottomBtn.classList.remove("show");
+  }, 3000);
+}
+
+// 🔥 KEY FIX
+window.addEventListener("scroll", handleScrollButtons);
+
+// Also trigger when page loads
+setTimeout(handleScrollButtons, 500);
 // 👇 PASTE HERE
 async function importJSON(event) {
   const file = event.target.files[0];
