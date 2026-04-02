@@ -883,15 +883,13 @@ function exportTXT() {
     text += `--------------------------\n`;
   });
   
-  const blob = new Blob(["\uFEFF" + data], {
-    type: "text/plain;charset=utf-8"
-  });
-
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = "diary.txt";
   a.click();
-}
   
   URL.revokeObjectURL(url);
 }
