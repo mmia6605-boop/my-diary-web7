@@ -121,28 +121,9 @@ body.dark #liveAmount {
   align-self: flex-end;
   margin-bottom: 4px; /* Align with input margin */
 }
-#topBtn, #bottomBtn{
-  position: fixed;
-  right: 10px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 18px;
-  border: none;
-  cursor: pointer;
-  z-index: 999;
-
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-
-#topBtn{ bottom: 70px; }
-#bottomBtn{ bottom: 20px; }
-
-#topBtn.show, #bottomBtn.show{
-  opacity: 0.8;
-  pointer-events: auto;
+html, body {
+  height: auto !important;
+  overflow-y: scroll !important;
 }
   </style>
 
@@ -155,7 +136,19 @@ body.dark #liveAmount {
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+<div id="statusBar" style="
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 20px;
 
+  background: rgba(0,0,0,0.1);
+  color: inherit;
+
+  text-align: center;
+  margin: 5px auto;
+  width: fit-content;
+">
+</div>
 <div id="login">
   <h2>Login</h2>
   <div class="login-container">
@@ -236,7 +229,10 @@ const firebaseConfig={
 };
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
-
+db.enablePersistence()
+  .catch((err) => {
+    console.log("Persistence error:", err.code);
+  });
 let data=[],editId=null,monthlyChart=null;
 
 let sortType = "new";
@@ -282,16 +278,75 @@ function applyTheme(theme){
   }
 }
 
+function updateStatus() {
+  const bar = document.getElementById("statusBar");
+  
+  if (navigator.onLine) {
+    bar.innerText = "🟢 Online";
+    bar.style.background = "#d4edda";
+    bar.style.color = "#155724";
+  } else {
+    bar.innerText = "🔴 Offline";
+    bar.style.background = "#f8d7da";
+    bar.style.color = "#721c24";
+  }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+
+// initial
+updateStatus();
+
+let loginMode = "offline"; // default
+
 // Login
-function login(){
-  let email=document.getElementById("email").value;
-  let password=document.getElementById("password").value;
-  if(!email||!password){ alert("Enter email & password"); return; }
-  firebase.auth().signInWithEmailAndPassword(email,password)
-    .then(()=>{ document.getElementById("login").style.display="none"; document.getElementById("app").style.display="block"; 
-    document.body.classList.add("logged-in");
-    loadData(); })
-    .catch(err=>{ alert("Login Error: "+err.message); });
+function login() {
+  let email = document.getElementById("email").value;
+  let password = document.getElementById("password").value;
+  
+  if (!email || !password) {
+    alert("Enter email & password");
+    return;
+  }
+  
+  if (navigator.onLine) {
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then(() => {
+        localStorage.setItem("userLoggedIn", "true");
+        
+        loginMode = "online"; // ✅ IMPORTANT
+        
+        document.getElementById("login").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        
+        loadData();
+      })
+      .catch(err => {
+        alert("Login Error: " + err.message);
+      });
+  }
+  else {
+    if (localStorage.getItem("userLoggedIn") === "true") {
+      loginMode = "offline"; // ❗ offline login
+      
+      document.getElementById("login").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      
+      loadData();
+    } else {
+      alert("No internet & no saved login!");
+    }
+  }
+}
+
+function showSyncStatus(message) {
+  const el = document.getElementById("syncStatus");
+  el.innerText = message;
+  
+  setTimeout(() => {
+    el.innerText = "";
+  }, 2000);
 }
 
 // Parse amount from note
@@ -345,6 +400,7 @@ document.getElementById("imageInput").addEventListener("change", function(e){
 });
 // Add/Update Entry
 async function addEntry(){
+
   let date=document.getElementById("date").value || new Date().toISOString().split('T')[0];
   let time=document.getElementById("time").value || new Date().toTimeString().slice(0,5);
   let note=document.getElementById("note").value.trim();
@@ -375,7 +431,11 @@ async function addEntry(){
   document.getElementById("imageInput").value = ""; // clear file input
   loadData();
 }
-
+if (navigator.onLine) {
+  showSyncStatus("☁️ Syncing...");
+} else {
+  showSyncStatus("💾 Saved Offline");
+}
 // Clear all fields
 function clearAllFields() {  
   document.getElementById("date").value = "";  
@@ -392,24 +452,35 @@ loadData(); // ✅ reload full data
 }
 
 // Load Data and sort
-async function loadData(){
-  let snapshot = await db.collection("entries").get();
-  data = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-
-  // use global sortType (no dropdown)
-  data.sort((a,b)=>{
-    const parseDate = str=>{
-      const [d,m,y,t] = str.split(/[/ ]/);
-      const [h,min] = t.split(":").map(Number);
-      return new Date(y,m-1,d,h,min);
-    };
-    const dateA = parseDate(a.date);
-    const dateB = parseDate(b.date);
-    return sortType==="new"? dateB-dateA : dateA-dateB;
-  });
-
-  display(data);
-  renderChart(data);populateYearOptions(data);
+function loadData() {
+  db.collection("entries")
+    .onSnapshot(snapshot => {
+      
+      if (navigator.onLine) {
+        showSyncStatus("✅ Synced");
+      }
+      
+      data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // 🔽 Sort
+      data.sort((a, b) => {
+        const parseDate = str => {
+          const [d, m, y, t] = str.split(/[/ ]/);
+          const [h, min] = t.split(":").map(Number);
+          return new Date(y, m - 1, d, h, min);
+        };
+        const dateA = parseDate(a.date);
+        const dateB = parseDate(b.date);
+        return sortType === "new" ? dateB - dateA : dateA - dateB;
+      });
+      
+      display(data);
+      renderChart(data);
+      populateYearOptions(data);
+    });
 }
 
 // Display with swipe
@@ -470,7 +541,24 @@ if (isSearching) {
       box.className="box";
       box.id="item-"+item.id;
       // Inside your display(arr) function, update the innerHTML:
-box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div>${item.note.trim()} - ₹${item.amount}</div>${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" onclick="openImage('${item.image}')">` : ''}</div><div class="box-buttons"><button onclick="editItem('${item.id}')">Edit</button><button onclick="togglePin('${item.id}')">${item.pinned?'Unpin':'Pin'}</button><button onclick="deleteItem('${item.id}')">Delete</button></div>`;
+box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div>${item.note.trim()} - ₹${item.amount}</div>${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" onclick="openImage('${item.image}')">` : ''}</div><div class="box-buttons">
+<button 
+  onclick="editItem('${item.id}')" 
+  ${loginMode !== "online" ? 'disabled style="opacity:0.4;"' : ''}
+>
+  Edit
+</button>
+<button 
+  onclick="togglePin('${item.id}')" 
+  ${loginMode !== "online" ? 'disabled style="opacity:0.4;"' : ''}
+>
+  ${item.pinned ? 'Unpin' : 'Pin'}
+</button><button 
+  onclick="deleteItem('${item.id}')" 
+  ${loginMode !== "online" ? 'disabled style="opacity:0.4;"' : ''}
+>
+  Delete
+</button></div>`;
 
 
       // Swipe functionality
@@ -531,14 +619,35 @@ function searchData() {
   display(filtered);
 }
 
-async function deleteItem(id){
-  if(!confirm("Are you sure you want to delete this entry?")) return;
+async function deleteItem(id) {
+  
+  // ❌ Block if not ONLINE LOGIN
+  if (loginMode !== "online") {
+    alert("❌ Delete allowed only after online login");
+    return;
+  }
+  
+  if (!confirm("Are you sure you want to delete this entry?")) return;
+  
   await db.collection("entries").doc(id).delete();
-  loadData();
 }
 
-async function togglePin(id){ const item=data.find(d=>d.id===id); await db.collection("entries").doc(id).update({pinned:!item.pinned}); loadData(); }
+async function togglePin(id) {
+  
+  if (loginMode !== "online") {
+    alert("❌ Pin allowed only after online login");
+    return;
+  }
+  
+  const item = data.find(d => d.id === id);
+  await db.collection("entries").doc(id).update({ pinned: !item.pinned });
+  loadData();
+}
 function editItem(id) {
+  if (loginMode !== "online") {
+  alert("❌ Edit allowed only after online login");
+  return;
+}
   let item = data.find(d => d.id === id);
   
   const [day, month, year, time] = item.date.split(/[/ ]/);
@@ -762,52 +871,7 @@ function closeImage() {
   modal.style.display = "none";
   img.src = "";
 }
-let hideTimer;
 
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function scrollToBottom() {
-  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-}
-
-function handleScrollButtons() {
-  const topBtn = document.getElementById("topBtn");
-  const bottomBtn = document.getElementById("bottomBtn");
-  
-  if (!topBtn || !bottomBtn) return;
-  
-  const scrollTop = window.scrollY;
-  const pageHeight = document.documentElement.scrollHeight;
-  const screenHeight = window.innerHeight;
-  
-  // Show buttons
-  if (scrollTop > 50) {
-    topBtn.classList.add("show");
-  } else {
-    topBtn.classList.remove("show");
-  }
-  
-  if (scrollTop + screenHeight < pageHeight - 50) {
-    bottomBtn.classList.add("show");
-  } else {
-    bottomBtn.classList.remove("show");
-  }
-  
-  // Auto hide after 3 sec
-  clearTimeout(hideTimer);
-  hideTimer = setTimeout(() => {
-    topBtn.classList.remove("show");
-    bottomBtn.classList.remove("show");
-  }, 3000);
-}
-
-// 🔥 KEY FIX
-window.addEventListener("scroll", handleScrollButtons);
-
-// Also trigger when page loads
-setTimeout(handleScrollButtons, 500);
 // 👇 PASTE HERE
 async function importJSON(event) {
   const file = event.target.files[0];
@@ -858,19 +922,7 @@ document.getElementById("imageModal").addEventListener("click", function(e) {
     closeImage();
   }
 });
-function scrollToTop() {
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
-}
 
-function scrollToBottom() {
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: "smooth"
-  });
-}
 function exportTXT() {
   if (!confirm("Export all entries as TXT?")) return;
   
@@ -909,6 +961,55 @@ function exportJSON() {
   URL.revokeObjectURL(url);
 }
 
+// ✅ STRONG SCROLL FIX
+
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
+}
+// Scroll functions
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function scrollToBottom() {
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: "smooth"
+  });
+}
+
+// Auto show + hide
+let scrollTimeout;
+
+function showScrollButtons() {
+  const btns = document.getElementById("scrollBtns");
+  if (!btns) return;
+  
+  btns.style.opacity = "1";
+  btns.style.pointerEvents = "auto";
+  
+  clearTimeout(scrollTimeout);
+  
+  scrollTimeout = setTimeout(() => {
+    btns.style.opacity = "0";
+    btns.style.pointerEvents = "none";
+  }, 3000);
+}
+
+// Detect scroll
+window.addEventListener("scroll", showScrollButtons);
+document.addEventListener("scroll", showScrollButtons);
+window.addEventListener("touchmove", showScrollButtons);
+function scrollToBottom() {
+  window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: "smooth"
+  });
+}
+
 </script>
 <!-- ✅ IMAGE MODAL START -->
 <div id="imageModal" style="
@@ -942,8 +1043,76 @@ function exportJSON() {
   
 </div>
 <!-- ✅ IMAGE MODAL END -->
+
+<div id="scrollBtns" style="
+  position: fixed;
+  bottom: 90px;
+  right: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: #scrollBtns {
+position: fixed !important;
+right: 15px !important; /* 👉 RIGHT SIDE */
+left: auto !important; /* ❌ REMOVE LEFT */
+bottom: 120px !important;
+
+display: flex;
+flex-direction: column;
+gap: 10px;
+
+z-index: 9999;
+
+opacity: 0.8;
+pointer-events: none;
+transition: opacity 0.3s;
+}
+
+#scrollBtns button {
+width: 50px;
+height: 50px;
+font-size: 18px;
+border-radius: 10px;
+}.3s;
+">
+  
+  <button onclick="scrollToTop()" style="width:50px;height:50px;">⬆</button>
+  <button onclick="scrollToBottom()" style="width:50px;height:50px;">⬇</button>
+  
+</div>
+
+<!-- ✅ FINAL Scroll Buttons -->
+<div id="scrollBtns" style="
+  position: fixed;
+  bottom: 10px;
+  right: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+">
+  
+  <button onclick="scrollToTop()" style="
+    width:30px;height:30px;
+    border-radius:10px;
+    font-size:10px;
+  ">⬆</button>
+  
+  <button onclick="scrollToBottom()" style="
+    width:30px;height:30px;
+    border-radius:10px;
+    font-size:10px;
+  ">⬇</button>
+  
+</div>
+
 <!-- Scroll Buttons -->
-<button id="topBtn" onclick="scrollToTop()">⬆</button>
-<button id="bottomBtn" onclick="scrollToBottom()">⬇</button>
+<div id="syncStatus" style="font-size:12px; text-align:center;"></div>
+
+<div style="height:100px"></div>
+
 </body>
 </html>
