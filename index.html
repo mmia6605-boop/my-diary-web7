@@ -153,6 +153,23 @@ html, body {
   width: fit-content;
 ">
 </div>
+
+<div id="backupReminder" style="
+  position: absolute;
+  top:1px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#ffcc00;
+  color:#000;
+  padding:2px 6px;
+  font-size:12px;
+  border-radius:20px;
+  z-index:9999;
+  display:none;
+">
+  ⚠ Backup Now
+</div>
+
 <div id="login">
   <h2>Login</h2>
   <div class="login-container">
@@ -325,6 +342,7 @@ function login() {
         document.getElementById("app").style.display = "block";
         
         loadData();
+        checkBackupReminder();
       })
       .catch(err => {
         alert("Login Error: " + err.message);
@@ -338,6 +356,7 @@ function login() {
       document.getElementById("app").style.display = "block";
       
       loadData();
+      checkBackupReminder();
     } else {
       alert("No internet & no saved login!");
     }
@@ -956,6 +975,9 @@ function exportTXT() {
 function exportJSON() {
   if (!confirm("Export all entries as JSON?")) return;
   
+  localStorage.setItem("lastBackupDate", Date.now());
+checkBackupReminder();
+  
   const json = JSON.stringify(data, null, 2);
   
   const blob = new Blob([json], { type: "application/json" });
@@ -1024,7 +1046,28 @@ if ("serviceWorker" in navigator) {
     .catch(err => console.log("SW error", err));
 }
 
+// 🔁 Check backup reminder
+function checkBackupReminder() {
+  const lastBackup = localStorage.getItem("lastBackupDate");
+  const now = Date.now();
+  
+  if (!lastBackup) {
+    // Never backed up → show
+    document.getElementById("backupReminder").style.display = "block";
+    return;
+  }
+  
+  const diffDays = (now - Number(lastBackup)) / (1000 * 60 * 60 * 24);
+  
+  if (diffDays >= 3){
+    document.getElementById("backupReminder").style.display = "block";
+  } else {
+    document.getElementById("backupReminder").style.display = "none";
+  }
+}
+
 </script>
+
 <!-- ✅ IMAGE MODAL START -->
 <div id="imageModal" style="
   display:none;
