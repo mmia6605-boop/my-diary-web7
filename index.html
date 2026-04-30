@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -229,6 +230,7 @@ html, body {
   <div style="display:flex; gap:5px; margin-top:10px;">
   <button onclick="exportTXT()">Export TXT</button>
   <button onclick="exportJSON()">Export JSON</button>
+  <button onclick="shareBackup()">Backup & Share</button>
   <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
   <button onclick="document.getElementById('importFile').click()">Import JSON</button>
 </div>
@@ -440,7 +442,11 @@ async function addEntry(){
   let amount = parseAmount(note, manualAmount);
 
   const [year,month,day] = date.split("-");
-  const formattedDate = day+"/"+month+"/"+year+" "+time;
+  const dayName = new Date(date).toLocaleDateString('en-US', {
+  weekday: 'short'
+});
+
+const formattedDate = dayName + ", " + day + "/" + month + "/" + year + " " + time;
 
   const entryData = { date: formattedDate, note, amount, pinned:false, created:Date.now(), image:imageBase64 };
 
@@ -1059,13 +1065,53 @@ function checkBackupReminder() {
   
   const diffDays = (now - Number(lastBackup)) / (1000 * 60 * 60 * 24);
   
-  if (diffDays >= 3){
+  if (diffDays >= 4) {
     document.getElementById("backupReminder").style.display = "block";
   } else {
     document.getElementById("backupReminder").style.display = "none";
   }
 }
 
+async function shareBackup(){
+  try {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+
+    const file = new File(
+      [blob],
+      "diary_backup_" + new Date().toISOString().split("T")[0] + ".json",
+      { type: "application/json" }
+    );
+
+    // ✅ Proper support check (IMPORTANT FIX)
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      
+      await navigator.share({
+        title: "Diary Backup",
+        text: "My diary backup",
+        files: [file]
+      });
+
+    } else {
+      throw new Error("File sharing not supported");
+    }
+
+    // ✅ Backup reminder reset
+    localStorage.setItem("lastBackupDate", Date.now());
+    checkBackupReminder();
+
+  } catch (err) {
+    console.log("Share error:", err);
+
+    // 🔽 fallback (download)
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type:"application/json"}));
+    a.download = "diary_backup.json";
+    a.click();
+
+    alert("Share failed → File downloaded instead.");
+  }
+}
 </script>
 
 <!-- ✅ IMAGE MODAL START -->
