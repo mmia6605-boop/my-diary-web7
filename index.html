@@ -576,7 +576,7 @@ if (isSearching) {
       box.className="box";
       box.id="item-"+item.id;
       // Inside your display(arr) function, update the innerHTML:
-box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div> 
+box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div> ${item.note.replace(/'/g, "").trim()}
   ${item.amount > 0 ? ` 💸 ₹${item.amount}` : ""}
 </div>${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" onclick="openImage('${item.image}')">` : ''}</div><div class="box-buttons">
 <button 
