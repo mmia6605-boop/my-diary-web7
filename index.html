@@ -407,7 +407,7 @@ noteBox.addEventListener("input", () => {
   
   // ✅ Live amount
   const liveAmt = parseAmount(note, null);
-  document.getElementById("liveAmount").value = liveAmt;
+  document.getElementById("liveAmount").value = liveAmt > 0 ? liveAmt : "";
   
   // ✅ Auto height
   noteBox.style.height = "auto"; // reset
@@ -576,7 +576,9 @@ if (isSearching) {
       box.className="box";
       box.id="item-"+item.id;
       // Inside your display(arr) function, update the innerHTML:
-box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div>${item.note.trim()} - ₹${item.amount}</div>${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" onclick="openImage('${item.image}')">` : ''}</div><div class="box-buttons">
+box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>${item.date}</strong></div><div> ${item.note.trim()}
+  ${item.amount > 0 ? ` 💸 ₹${item.amount}` : ""}
+</div>${item.image ? `<br><img src="${item.image}" style="max-width:100px; max-height:80px; margin-top:5px; border-radius:4px; cursor:pointer;" onclick="openImage('${item.image}')">` : ''}</div><div class="box-buttons">
 <button 
   onclick="editItem('${item.id}')" 
   ${loginMode !== "online" ? 'disabled style="opacity:0.4;"' : ''}
@@ -696,7 +698,7 @@ function editItem(id) {
 noteBox.style.height = "auto";
 noteBox.style.height = noteBox.scrollHeight + "px";
   document.getElementById("amount").value = "";
-  document.getElementById("liveAmount").value = parseAmount(item.note, null);
+  
   
   // ✅ Show previous image if exists
   imageBase64 = item.image || null;
