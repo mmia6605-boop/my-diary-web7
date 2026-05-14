@@ -87,6 +87,17 @@ body.dark #liveAmount {
 #sortBtn.rotate {
   transform: rotate(180deg);
 }
+#imageFilterBtn {
+  width: 35px;
+  height: 35px;
+  font-size: 16px;
+  padding: 0;
+}
+
+#imageFilterBtn.active {
+  background: #4caf50;
+  color: white;
+}
 
 #searchSortBar {
   position: relative;  /* normal flow */
@@ -204,9 +215,13 @@ html, body {
   </div>
 
   <div id="searchSortBar" style="display:flex; gap:5px; align-items:center;">
+  
   <input type="text" id="search" placeholder="Search..." onkeyup="searchData()" style="flex:1;">
   
+  <button id="imageFilterBtn" onclick="toggleImageFilter()">🖼</button>
+  
   <button id="sortBtn" onclick="toggleSort()">🔽</button>
+  
 </div>
 
   <h3>Total This Month: ₹<span id="total">0</span></h3>
@@ -257,11 +272,28 @@ db.enablePersistence()
 let data=[],editId=null,monthlyChart=null;
 
 let sortType = "new";
+let imageFilter = false;
 
 function toggleSort() {
   sortType = (sortType === "new") ? "old" : "new";
   loadData();
 }
+
+function toggleImageFilter() {
+  
+  imageFilter = !imageFilter;
+  
+  const btn = document.getElementById("imageFilterBtn");
+  
+  if (imageFilter) {
+    btn.classList.add("active");
+  } else {
+    btn.classList.remove("active");
+  }
+  
+  searchData();
+}
+
 function toggleSort() {
   sortType = (sortType === "new") ? "old" : "new";
   
@@ -512,9 +544,9 @@ function loadData() {
         return sortType === "new" ? dateB - dateA : dateA - dateB;
       });
       
-      display(data);
-      renderChart(data);
-      populateYearOptions(data);
+      searchData();
+renderChart(data);
+populateYearOptions(data);
     });
 }
 
@@ -621,39 +653,47 @@ box.innerHTML = `<div class="box-content" style="line-height:1.2;"><div><strong>
 // Pin/Unpin/Search/Edit/Delete/Clear
 function togglePinned(){ const sec=document.getElementById("pinned"); sec.style.display=sec.style.display==="block"?"none":"block"; }
 function searchData() {
-  let text = document.getElementById("search").value.toLowerCase().trim();
-  
-  // ✅ If empty → show all data (current month total handled in display)
-  if (!text) {
-    display(data);
-    return;
-  }
-  
-  const filtered = data.filter(d => {
-    const noteMatch = d.note.toLowerCase().includes(text);
-    
-    const [day, month, year] = d.date.split(" ")[0].split("/");
-    
-    const dateObj = new Date(year, month - 1, day);
-    
-    const monthName = dateObj.toLocaleString('default', { month: 'long' }).toLowerCase();
-    const monthShort = dateObj.toLocaleString('default', { month: 'short' }).toLowerCase();
-    
-    const monthMatch =
-      monthName.includes(text) ||
-      monthShort.includes(text) ||
-      month === text ||
-      year.includes(text);
-    
-    // ✅ FIXED
-    const monthYearMatch = `${month}/${year}`.includes(text);
-    
-    const fullDateMatch = `${day}/${month}/${year}`.includes(text);
-    
-    return noteMatch || monthMatch || monthYearMatch || fullDateMatch;
-  });
-  
-  display(filtered);
+
+let text = document.getElementById("search").value.toLowerCase().trim();
+
+let filtered = [...data];
+
+// ✅ Image filter
+if(imageFilter){
+filtered = filtered.filter(item => item.image);
+}
+
+// ✅ Search filter
+if(text){
+
+filtered = filtered.filter(d => {
+
+const noteMatch = d.note.toLowerCase().includes(text);
+
+const [day, month, year] = d.date.split(" ")[0].split("/");
+
+const dateObj = new Date(year, month - 1, day);
+
+const monthName = dateObj.toLocaleString('default', { month: 'long' }).toLowerCase();
+
+const monthShort = dateObj.toLocaleString('default', { month: 'short' }).toLowerCase();
+
+const monthMatch =
+monthName.includes(text) ||
+monthShort.includes(text) ||
+month === text ||
+year.includes(text);
+
+const monthYearMatch = `${month}/${year}`.includes(text);
+
+const fullDateMatch = `${day}/${month}/${year}`.includes(text);
+
+return noteMatch || monthMatch || monthYearMatch || fullDateMatch;
+
+});
+}
+
+display(filtered);
 }
 
 async function deleteItem(id) {
