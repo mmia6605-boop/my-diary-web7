@@ -564,7 +564,7 @@ const grouped = {};
 arr.forEach(item => {
   const [day, month, year] = item.date.split(" ")[0].split("/");
   const dt = new Date(year, month - 1, day);
-  const monthKey = dt.getFullYear() + "-" + (dt.getMonth() + 1);
+  const monthKey = dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
   
   if (!grouped[monthKey]) grouped[monthKey] = [];
   grouped[monthKey].push(item);
@@ -593,7 +593,9 @@ if (isSearching) {
   totalLabel.innerHTML = `Total This Month: ₹<span id="total">${total}</span>`;
 }
 
-  Object.keys(grouped).sort((a,b)=>b.localeCompare(a)).forEach(monthKey=>{
+  Object.keys(grouped).sort((a, b) => {
+    return b.localeCompare(a);
+  }).forEach(monthKey => {
     const monthItems=grouped[monthKey];
     const [year,month]=monthKey.split("-");
     const monthName=new Date(year,month-1).toLocaleString('default',{month:'long',year:'numeric'});
